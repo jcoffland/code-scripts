@@ -1,0 +1,138 @@
+#!/usr/bin/env python
+
+from optparse import OptionParser
+import re
+import sys
+
+
+'''
+PATS=$PATS';s/[[:space:]]\?\(\(->\)\|\.\)[[:space:]]\?/\1/g' # -> and .
+PATS=$PATS';s/^[[:space:]]*\(#include.*[<"\/]\)[[:space:]]*/\1/g' # #include
+'''
+
+class Replace:
+    def __init__(self, pattern, replace, count = 0):
+        self.re = re.compile(pattern)
+        self.replace = replace
+        self.count = count
+
+
+    def __call__(self, s):
+        return self.re.sub(self.replace, s, self.count)
+
+
+# Space
+tabRepl = Replace(r'\t', r'    ')
+spaceRepl = Replace(r'(\S)\s\s+', r'\1 ')
+eolSpaceRepl = Replace(r'\s+$', r'')
+
+spaceBeforeRepl = Replace(r'([\w\)\[])([|&+*/%<>=-])', r'\1 \2')
+spaceAfterRepl = Replace(r'([|&;+*/%<>=,-])([\w\(\[])', r'\1 \2')
+noSpaceAfter1Repl = Replace(r'([{\[\(])\s*', r'\1')
+noSpaceAfter2Repl = Replace(r'([)\]])\s*([;.-])', r'\1\2')
+noSpaceBefore1Repl = Replace(r'(\S)\s+([;}\]\)])', r'\1\2')
+noSpaceBefore2Repl = Replace(r'(\w)\s*([(\[])', r'\1\2')
+stmtSpaceRepl = Replace(r'((if)|(for)|(while)|(switch))\(', r'\1 (')
+comment1Repl = Replace(r'/\*\s*(.*)\s*\*/', r'// \1')
+comment2Repl = Replace(r'//\s*(.*)$', r'// \1')
+comment3Repl = Replace(r'(\S)\s*//', r'\1 //')
+constFloat1Repl = Replace(r'(\d)\.(\D)', r'\1.0\2')
+constFloat2Repl = Replace(r'(\D)\.(\d)', r'\g<1>0.\2')
+castRepl = Replace(r'(\([\w<>\[\]]+(\s*[&*])?\))\s*', r'\1')
+voidRepl = Replace(r'\(void\)', r'()')
+
+# Fixes
+uniary1Repl = Replace(r'((^|[,=\({\[])\s*[!~*&+-])\s*', r'\1')
+uniary2Repl = Replace(r'(\w)\s*((\+\+)|(--))', r'\1\2')
+uniary3Repl = Replace(r'((\+\+)|(--))\s*(?P<word>\w)', r'\1\g<word>')
+derefRepl = Replace(r'\s?((->)|\.)\s?', r'\1')
+charsRepl = Replace(r"'\s?(.)\s?'", r"'\1'")
+refTypeRepl = Replace(r'^(\s*\w+(\[\s*\d+\s*\])*\s*[*&])\s*', r'\1')
+
+#Repl = Replace(r'', r'')
+
+repls = [
+    tabRepl, spaceRepl,
+    spaceBeforeRepl, spaceAfterRepl,
+    noSpaceAfter1Repl, noSpaceAfter2Repl,
+    noSpaceBefore1Repl, noSpaceBefore2Repl,
+    stmtSpaceRepl,
+    comment1Repl, comment2Repl, comment3Repl,
+    constFloat1Repl, constFloat2Repl,
+    castRepl, voidRepl,
+    uniary1Repl, uniary2Repl, uniary3Repl,
+    derefRepl, charsRepl,
+    refTypeRepl,
+    eolSpaceRepl, spaceRepl,
+    ]
+
+includeRE = re.compile(r'^\s*#\s*((include)|(import))')
+stringsRE = re.compile(r'"([^"]|(\\"))*"')
+ocBraceRE = re.compile(r'^\s*{\s*$')
+elseRE = re.compile(r'^\s*else')
+
+# Parse args
+parser = OptionParser(usage = 'Usage: %prog [options] \n\n')
+options, args = parser.parse_args()
+
+
+def clean(s):
+    if includeRE.match(s):
+        pass 
+    else:
+        for repl in repls: s = repl(s)
+
+    return s
+
+
+for arg in args:
+    count = 0
+
+    f = None
+    try:
+        f = open(arg, 'r')
+        for line in f.readlines():
+            line = spaceRepl(line)
+
+            # Avoid strings
+            m = stringsRE.search(line)
+            if m:
+                s = ''
+                start = 0
+
+                while m:
+                    if m.start() != start: s += clean(line[start:m.start() + 1])
+                    s += line[m.start() + 1:m.end() - 1]
+                    start = m.end() - 1
+
+                    m = stringsRE.search(line, m.end())
+
+                    if not m: s += clean(line[start:])
+
+                line = s
+
+            else: line = clean(line)
+
+            eol = True
+
+            # Dangling open curly braces
+            if ocBraceRE.match(line):
+                eol = False
+                line = ' {'
+
+            # Dangling else
+            m = elseRE.match(line)
+            if m:
+                eol = False
+                line = ' else' + line[m.end():]
+
+            # EOL
+            if eol and count: sys.stdout.write('\n')
+            count += 1
+
+            sys.stdout.write(line)
+
+        sys.stdout.write('\n')
+
+    finally:
+        if f: f.close()

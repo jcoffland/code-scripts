@@ -1,0 +1,12 @@
+#!/bin/bash
+PATTERN='^.\{81\}'
+SOURCE="$(findSource "$@")"
+FILES="$(grep -l $PATTERN $SOURCE)"
+TOTAL_LINES=$(grep $PATTERN $SOURCE | wc -l) 
+
+for FILE in $FILES; do
+   LINES=$(grep $PATTERN $FILE | wc -l)
+   printf "%6d %s\\n" $LINES $FILE
+done
+
+printf "%6d lines in total\\n" $TOTAL_LINES

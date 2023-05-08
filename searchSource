@@ -1,0 +1,45 @@
+#!/bin/bash
+
+declare -a GARGS
+declare -a FARGS
+
+usage() {
+    echo "Usage: $1 [OPTIONS] <pattern>"
+    echo "  -L              Follow symlinks."
+    echo "  -D <dir>        Search in this directory."
+    echo "  -E <exts>       Search for these file extensions. (default = $EXTS)"
+    echo "  --help          Show this help screen and exit."
+    echo "All other arguments are pass to grep"
+}
+
+while [ "$1" != "" ]; do
+    case "$1" in
+        -L)
+            FARGS[${#FARGS[*]}]="$1"
+            ;;
+
+        -D | -E)
+            FARGS[${#FARGS[*]}]="$1"
+            FARGS[${#FARGS[*]}]="$2"
+            shift
+            ;;
+
+        --help)
+            usage "$0"
+            exit 0
+            ;;
+
+        *)
+            GARGS[${#GARGS[*]}]="$1"
+            ;;
+    esac
+    shift
+done
+
+if [ ${#GARGS[*]} -eq 0 ]; then
+    usage "$0"
+    echo -e "\nERROR: Missing pattern argument"
+    exit 1
+fi
+
+findSource "${FARGS[@]}" | xargs grep "${GARGS[@]}"

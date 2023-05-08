@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if [ "$1" == "" ]; then
+  echo "Usage: $0 <file>..."
+  exit 1
+fi
+
+while [ "$1" != "" ]; do
+  C=0
+  LAST=
+  while true; do
+    BACKUP="$1".${C}~
+    if [ ! -e "$BACKUP" ]; then
+      BACKUP="$LAST"
+      break
+    fi
+
+    LAST="$BACKUP"
+    C=$(($C + 1))
+  done
+
+  if [ -e "$BACKUP" ]; then
+    mv "$BACKUP" "$1"
+    echo "Restored '$1'"
+  fi
+
+  shift
+done

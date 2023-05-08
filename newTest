@@ -1,0 +1,61 @@
+#!/bin/bash
+
+COMMAND_OVERRIDE=
+
+while [ "$1" != "" ]; do
+    case "$1" in
+        -c)
+            COMMAND_OVERRIDE="$2"
+            shift
+            ;;
+        *)
+            echo "Invalid argument '$1'"
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+TESTS=$(
+    find ./data -name \*.return.expect |
+    sed 's/\.\/data\/\(.*\)Test\.return\.expect/\1/'
+)
+
+(
+    echo "class Suite:"
+    echo "    def __init__(self, th):"
+    for i in $TESTS; do
+        BASE=./data/${i}Test
+        DATA=./$i.data
+
+        mkdir -p $DATA/expect
+        for f in $BASE.*; do
+            EXPECT=$(echo -n $f |
+                sed "s/\.\/data\/${i}Test\.\(.*\)\.expect/\1/")
+            NAME=$(echo -n $f | sed "s/\.\/data\/${i}Test\.\(.*\)/\1/")
+
+            if [ $EXPECT != $f ]; then
+                cp $f $DATA/expect/$EXPECT
+            elif [ $NAME != "args" ]; then
+                cp $f $DATA/$NAME
+            fi
+        done
+
+        if [ "$COMMAND_OVERRIDE" != "" ]; then
+            COMMAND="$COMMAND_OVERRIDE"
+        else
+            COMMAND=${i}Test
+        fi
+
+        echo -n "        th.Test('$i', command = '$COMMAND"
+
+        if [ -e $BASE.args ]; then
+            ARGS=$(cat $BASE.args)
+            echo -n " $ARGS"
+        fi
+
+        echo -n "'"
+
+        echo ")"
+    done
+    )>th.py

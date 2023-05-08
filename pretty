@@ -1,0 +1,11 @@
+#!/bin/bash
+
+DIR="$(dirname "$0")"
+
+for i in "$@"; do
+    uncrustify -c "$DIR"/uncrustify.cfg --no-backup "$i"
+
+    indent -ce -cdw -ncs -hnl -i2 -l80 -lc80 -lp -br -brs -nbc -nbbo \
+        -nbfda -npcs -nsaf -nsai -nsaw -nut -ppi0 -sai -saw -saf -brf -fca \
+        -fc1 -sob -nbad -npsl "$i"
+done

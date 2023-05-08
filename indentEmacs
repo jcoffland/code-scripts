@@ -1,0 +1,6 @@
+#!/bin/bash
+
+while [ "$1" != "" ]; do
+  emacs "$1" --batch --eval="(indent-region (point-min) (point-max) nil)" -f save-buffer
+  shift
+done

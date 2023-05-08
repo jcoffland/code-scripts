@@ -1,0 +1,11 @@
+#!/bin/sh
+
+FIRST=true
+for i in "$@"; do
+  if $FIRST; then
+    FIRST=false
+  else
+    echo -n "\\|"
+  fi
+  echo -n "\\($(echo -n "$i" | sed 's/\\/\\\\/g')\\)"
+done

@@ -1,0 +1,13 @@
+#!/bin/sh
+# (C)1997 by Marcin Dalecki
+#
+# This script will let You know if there are global symbols in the
+# current directory tree, which are not refferenced anywhere.
+# That's in esp. handy to find dead code...
+#
+# The grep command in the pipe below will let You forget about
+# symbols used by the module interface.
+#
+find ./ -name "*.o" -exec nm -g {} 2>/dev/null \; | cut -c10- | \
+grep -v '^?' | \
+sort +1 -t' ' | uniq -u -1

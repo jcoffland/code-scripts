@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import shutil
+
+debug = False
+
+
+c_style = {
+  'start':  '/' + ('*' * 78) + '\\',
+  'end':    '\\' + ('*' * 78) + '/',
+  'prefix': '  ',
+  'suffix': '',
+}
+
+
+python_style = {
+  'start':  '#' * 80,
+  'end':    '#' * 80,
+  'prefix': '# ',
+  'suffix': '#'
+}
+
+
+pug_style = {
+  'start':  '//-' + '/' * 77,
+  'end':    '//-' + '/' * 77,
+  'prefix': '//- ',
+  'suffix': '//'
+}
+
+
+xml_style = {
+  'start':  '<!--',
+  'end':    '-->',
+  'prefix': '  ',
+  'suffix': '',
+}
+
+
+extensions = {
+  'js':   c_style,
+  'tpl':  c_style,
+  'c':    c_style,
+  'cpp':  c_style,
+  'h':    c_style,
+  'hpp':  c_style,
+  'def':  c_style,
+  'styl': c_style,
+  'py':   python_style,
+  'jade': pug_style,
+  'pug':  pug_style,
+  'vue':  xml_style,
+}
+
+
+# Find and parse license
+license_filename = None
+for filename in 'CODE_TAG LICENSE LICENSE.txt COPYING COPYING.txt'.split():
+  if os.path.exists(filename):
+    license_filename = filename
+    break
+
+if license_filename is None:
+  raise Exception('Could not find a license file')
+
+license_text = open(license_filename, 'r').read()
+license_lines = license_text.split('\n')
+license_lines = list(map(str.strip, license_lines))
+
+
+def format_license(license_lines, style):
+  for line in license_lines:
+    line = line.strip()
+    line = line.center(80 - len(style['prefix'] + style['suffix']))
+    line = style['prefix'] + line + style['suffix']
+    yield line.rstrip()
+
+
+def license_file(filename, license_lines, style):
+  input = open(filename, 'r')
+  line = input.readline()
+
+  # Handle shebang
+  shebang = None
+  if line is not None and line.startswith('#!'):
+    shebang = line
+    line = input.readline()
+
+  # Ignore blank lines
+  while input and not line.strip():
+    line = input.readline()
+
+  # Format license lines
+  license_lines = list(format_license(license_lines, style))
+
+  # Look for existing license
+  if style['start'] == line.strip():
+    same = True
+    i = 0
+
+    while i == 0 or style['end'] != line.strip():
+      line = input.readline()
+      if not line:
+        raise Exception('Reached EOF with out finding end of copyright '
+                        'block: ' + filename)
+
+      # Skip blank lines
+      if not line.strip(): continue
+      while i < len(license_lines) and not license_lines[i].strip():
+        i += 1
+
+      # Match lines
+      if i < len(license_lines):
+        if line.strip() != license_lines[i].strip():
+          same = False
+          if debug:
+            print('Mismatch at line %d:' % i)
+            print('<', line)
+            print('>', license_lines[i])
+
+        i += 1
+
+      if not input:
+        raise Exception('Failed reading copyright block: ' + filename)
+
+    if same:
+      input.close()
+      return
+
+    line = None # Don't copy this line
+
+  # Add license
+  print('Adding license to ' + filename)
+
+  # Create backup
+  shutil.copy(filename, filename + '~')
+
+  # Open temporary output
+  output = open(filename + '.licenseCode', 'w')
+
+  # Handle shebang
+  if shebang is not None:
+    output.write(shebang)
+    output.write('\n')
+
+  # Write license tag
+  gap = 80 - len(style['prefix'] + style['suffix'])
+  blank = (style['prefix'] + ' ' * gap + style['suffix']).rstrip()
+  output.write(style['start'] + '\n')
+  output.write(blank + '\n')
+  output.write('\n'.join(license_lines))
+  output.write('\n' + style['end'] + '\n\n')
+
+  # Write rest of file
+  if line is not None and line.strip(): output.write(line)
+  else:
+    # Ignore initial blank lines
+    started = False
+    while True:
+      line = input.readline()
+
+      if not started:
+        if not line.strip(): continue
+        started = True
+
+      output.write(line)
+      break
+
+  # Copy the rest
+  output.write(input.read())
+
+  input.close()
+  output.close()
+
+  # Move file
+  os.unlink(filename)
+  os.rename(filename + '.licenseCode', filename)
+
+
+for filename in sys.argv[1:]:
+  root, ext = os.path.splitext(filename)
+  ext = ext[1:].lower()
+
+  if not ext in extensions:
+    print('Unsupported file suffix ".%s"' % ext)
+    continue
+
+  license_file(filename, license_lines, extensions[ext])

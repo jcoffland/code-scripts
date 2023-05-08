@@ -1,0 +1,3 @@
+#!/bin/bash
+
+rm -vf $(find . -type f -name \*~ -o -type f -name core)

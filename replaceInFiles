@@ -1,0 +1,36 @@
+#!/bin/bash
+
+if [ "$1" == "" ]; then
+  echo "Usage: $0 <pattern> <file>..."
+  exit 1
+fi
+
+PATTERN="$1"
+shift
+
+while [ "$1" != "" ]; do
+  C=0
+  while true; do
+    BACKUP="$1".${C}~
+    if [ ! -e "$BACKUP" ]; then
+      cp "$1" "$BACKUP"
+      break
+    fi
+    C=$(($C + 1))
+  done
+
+  sed "$PATTERN" <"$BACKUP" >"$1"
+  if [ $? -ne 0 ]; then
+    echo "Sed error"
+    exit 1
+  fi
+
+  diff "$1" "$BACKUP" 2>&1 >/dev/null
+  if [ $? -eq 0 ]; then
+    rm "$BACKUP"
+  else
+    echo "Modified '$1'"
+  fi
+
+  shift
+done

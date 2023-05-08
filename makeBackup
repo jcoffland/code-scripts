@@ -1,0 +1,7 @@
+#!/bin/bash
+
+tar cjvf fah-trunk-$(today).tar.bz2 $(
+  findSource |
+  grep -v .scon;
+  find . -name SConstruct -o -name \*.scons -o -name \*.sh  -o -name \*.html
+)

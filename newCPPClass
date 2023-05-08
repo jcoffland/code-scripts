@@ -1,0 +1,271 @@
+#!/bin/bash
+
+PROGNAME="$(basename "$0")"
+NAMESPACE=
+NAME=
+FILENAME=
+UPCASE_NAME=
+BASE=
+BASE_SCOPE=public
+WITH_CONSTRUCTOR=false
+INDENT=0
+BEGIN_LINE=true
+FORCE=false
+VERBOSE=false
+DO_IMPL=true
+VIRTUAL=false
+
+indent() {
+    C=$INDENT
+    while [ $C -gt 0 ]; do
+        echo -n " "
+        C=$(($C - 1))
+    done
+}
+
+up() {
+    INDENT=$(($INDENT + 2))
+}
+
+down() {
+    INDENT=$(($INDENT - 2))
+}
+
+print() {
+    if $BEGIN_LINE; then indent; fi
+
+    if [ "$1" == "-n" ]; then
+        BEGIN_LINE=false
+    else
+        BEGIN_LINE=true
+    fi
+
+    echo -e "$@"
+}
+
+doHeader() {
+    INDENT=0
+
+    print "#pragma once"
+    print
+
+    if [ "$BASE" != "" ]; then
+        echo "$BASEFILE" | grep "/" >/dev/null 2>/dev/null
+        if [ $? -eq 0 ]; then
+            print "#include <${BASEFILE}.h>"
+        else
+            print "#include \"${BASEFILE}.h\""
+        fi
+
+        print
+        print
+    fi
+
+    if [ "$NAMESPACE" != "" ]; then
+        for NS in $(echo "$NAMESPACE" | sed 's/::/ /g'); do
+            print "namespace $NS {"
+            up
+        done
+    fi
+
+    print -n "class $NAME "
+
+    if [ "$BASE" != "" ]; then
+        print -n ": $BASE_SCOPE $BASE "
+    fi
+
+    print "{"
+    print "public:"
+    up
+
+    if $WITH_CONSTRUCTOR; then
+        print -n "$NAME()"
+        if $DO_IMPL; then print ";"; else print " {}"; fi
+    fi
+
+    if $WITH_CONSTRUCTOR || $VIRTUAL; then
+        if $VIRTUAL; then print -n "virtual "; fi
+        print -n "~$NAME()"
+        if $DO_IMPL; then print ";"; else print " {}"; fi
+    fi
+
+    down
+    print "};"
+
+
+    if [ "$NAMESPACE" != "" ]; then
+        for NS in $(echo "$NAMESPACE" | sed 's/::/ /g'); do
+            down
+            print "}"
+        done
+    fi
+}
+
+doImpl() {
+    INDENT=0
+
+    print "#include \"${NAME}.h\""
+    print
+    if [ "$NAMESPACE" != "" ]; then
+        print "using namespace $NAMESPACE;"
+    fi
+
+    if $WITH_CONSTRUCTOR; then
+        print
+        print "$NAME::$NAME() {}"
+        print "$NAME::~$NAME() {}"
+    fi
+}
+
+usage() {
+    print "Syntax $PROGNAME [OPTIONS] [namespace [base class]] <name>"
+    print "OPTIONS:"
+    print "  -b <base class>   Set the base class"
+    print "  -c                add consturctor and descturctor"
+    print "  -f                overwrite existing files"
+    print "  -i                do NOT create the implementation file"
+    print "  -n <namespace>    Set the namespace"
+    print "  -p                used private scope for base class"
+    print "  -r                used protect scope for base class"
+    print "  -V                add virtual destructor"
+    print "  -v                verbose"
+    print "  -h|--help         print this help screen and exit"
+}
+
+check_arg() {
+    if [ "$2" == "" ]; then
+        echo "Option '$1' requires an argument"
+        echo 1
+    fi
+}
+
+# Process args
+while [ "$1" != "" ]; do
+    case "$1" in
+        "-c")
+            WITH_CONSTRUCTOR=true
+            ;;
+
+        "-b")
+            check_arg "$@"; shift
+            BASE="$1"
+            ;;
+
+        "-f")
+            FORCE=true
+            ;;
+
+        "-i")
+            DO_IMPL=false
+            ;;
+
+        "-n")
+            check_arg "$@"; shift
+            NAMESPACE="$1"
+            ;;
+
+        "-p")
+            BASE_SCOPE=private
+            ;;
+
+        "-r")
+            BASE_SCOPE=protected
+            ;;
+
+        "-v")
+            VERBOSE=true
+            ;;
+
+        "-V")
+            VIRTUAL=true
+            ;;
+
+        "--help" | "-h")
+            usage
+            exit 0
+            ;;
+
+        "-"*)
+            echo "Invalid option '$1'"
+            usage
+            exit 1
+            ;;
+
+        *)
+            if [ "$NAME" != "" ]; then
+                if [ "$NAMESPACE" != "" ]; then
+                    if [ "$BASE" != "" ]; then
+                        echo "Invalid arg '$1'"
+                        exit 1
+                    fi
+
+                    BASE="$NAME"
+
+                else
+                    NAMESPACE="$NAME"
+                fi
+            fi
+
+            NAME="$1"
+            ;;
+    esac
+
+    shift
+done
+
+
+# Check that we at least have a name
+if [ "$NAME" == "" ]; then
+    echo "Missing name argument"
+    usage
+    exit 1
+fi
+
+
+# Get filename
+DIR="$(dirname "$NAME")"
+NAME="$(basename "$NAME")"
+
+if [ "$(basename "$NAME" .h)" != "$NAME" ]; then
+    NAME="$(basename "$NAME" .h)"
+    DO_IMPL=false
+fi
+FILENAME="$DIR/$NAME"
+
+if [ "$BASE" != "" ]; then
+    BASEFILE="$BASE"
+    BASE="$(basename "$BASE")"
+fi
+
+if [ "$NAMESPACE" != "" ]; then
+    DEFINE_NAME=$(defineName --no-h "$NAMESPACE" "$FILENAME")
+else
+    DEFINE_NAME=$(defineName --no-h "$FILENAME")
+fi
+
+# Do it
+if [ -e "${FILENAME}.h" -a $FORCE == false ]; then
+    echo "'${FILENAME}.h' already exists"
+else
+    doHeader > "${FILENAME}.h"
+    licenseCode "${FILENAME}.h" >/dev/null
+
+    if $VERBOSE; then
+        echo "--------------------------- Header --------------------------"
+        cat "${FILENAME}.h"
+    fi
+fi
+
+if $DO_IMPL; then
+    if [ -e "${FILENAME}.cpp" -a $FORCE == false ]; then
+        echo "'${FILENAME}.cpp' already exists"
+    else
+        doImpl > "${FILENAME}.cpp"
+        licenseCode "${FILENAME}.cpp" >/dev/null
+
+        if $VERBOSE; then
+            echo "----------------------- Implementation ----------------------"
+            cat "${FILENAME}.cpp"
+        fi
+    fi
+fi

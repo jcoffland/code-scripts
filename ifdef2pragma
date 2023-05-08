@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sed -i 's/^#ifndef.*_H$/#pragma once/;/^#define.*_H$/d;/^#endif \/\/.*_H$/d' "$@"

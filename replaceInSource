@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if [ "$1" == "" ]; then
+  echo "Usage: $0 <pattern> [OPTIONS...]"
+  echo
+  echo "<pattern> is a sed regex replacement pattern."
+  echo "[OPTIONS...] are the same as for findSource."
+  exit 1
+fi
+
+PATTERN="$1"
+shift 
+
+sed -i "$PATTERN" $(findSource "$@")

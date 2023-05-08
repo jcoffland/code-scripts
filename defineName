@@ -1,0 +1,86 @@
+#!/bin/bash
+
+NAMESPACE=
+NAME=
+NO_H=false
+
+usage() {
+    print "Syntax $PROGNAME [OPTIONS] [namespace] <name>"
+    print "OPTIONS:"
+    print "  -n <namespace>    Set the namespace"
+    print "  --no-h            With out the _H suffix"
+    print "  -h|--help         print this help screen and exit"
+}
+
+
+# Process args
+while [ "$1" != "" ]; do
+    case "$1" in
+        "-n")
+            check_arg "$@"; shift
+            NAMESPACE="$1"
+            ;;
+
+        "--no-h") NO_H=true ;;
+
+        "--help" | "-h")
+            usage
+            exit 0
+            ;;
+
+        "-"*)
+            echo "Invalid option '$1'"
+            usage
+            exit 1
+            ;;
+
+        *)
+            if [ "$NAME" != "" ]; then
+                if [ "$NAMESPACE" != "" ]; then
+                    echo "Invalid arg '$1'"
+                    exit 1
+                else
+                    NAMESPACE="$NAME"
+                fi
+            fi
+            
+            NAME="$1"
+            ;;
+    esac
+
+    shift
+done
+
+# Get filename
+FILENAME="$NAME"
+NAME="$(basename "$NAME")"
+
+for j in .h .hpp; do
+    if [ "$NAME" != "$(basename "$NAME" $j)" ]; then
+        DO_IMPL=false
+        NAME="$(basename "$NAME" $j)"
+        FILENAME="$(dirname "$FILENAME")/$NAME"
+        break
+    fi
+done
+
+
+upcase() {
+    sed 'y/abcdefghijklmnopqrstuvwxyz/ABCDEFGHIJKLMNOPQRSTUVWXYZ/'
+}
+
+# Generate define name
+DEFINE_NAME=$(echo -n "$NAME" | sed 's/\([^A-Z]\)\([A-Z]\)/\1_\2/g' | upcase)
+
+
+# Add namespace to define
+if [ "$NAMESPACE" != "" ]; then
+    DEFINE_NAME="$(echo $NAMESPACE | upcase | sed 's/::/_/g' )_${DEFINE_NAME}"
+fi
+
+# Add suffix
+if ! $NO_H; then
+    DEFINE_NAME="${DEFINE_NAME}_T"
+fi
+
+echo "${DEFINE_NAME}"
