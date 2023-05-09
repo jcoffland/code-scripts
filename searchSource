@@ -2,44 +2,65 @@
 
 declare -a GARGS
 declare -a FARGS
+REMOVE=false
+SEARCH_DIR=
+
 
 usage() {
-    echo "Usage: $1 [OPTIONS] <pattern>"
-    echo "  -L              Follow symlinks."
-    echo "  -D <dir>        Search in this directory."
-    echo "  -E <exts>       Search for these file extensions. (default = $EXTS)"
-    echo "  --help          Show this help screen and exit."
-    echo "All other arguments are pass to grep"
+  echo "Usage: $1 [OPTIONS] <pattern>"
+  echo "  -L              Follow symlinks."
+  echo "  -D <dir>        Search in this directory."
+  echo "  -E <exts>       Search for these file extensions. (default = $EXTS)"
+  echo "  -R              Remove search directory from output."
+  echo "  --help          Show this help screen and exit."
+  echo "All other arguments are pass to grep"
 }
 
 while [ "$1" != "" ]; do
-    case "$1" in
-        -L)
-            FARGS[${#FARGS[*]}]="$1"
-            ;;
+  case "$1" in
+    -L)
+      FARGS[${#FARGS[*]}]="$1"
+      ;;
 
-        -D | -E)
-            FARGS[${#FARGS[*]}]="$1"
-            FARGS[${#FARGS[*]}]="$2"
-            shift
-            ;;
+    -E)
+      FARGS[${#FARGS[*]}]="$1"
+      FARGS[${#FARGS[*]}]="$2"
+      shift
+      ;;
 
-        --help)
-            usage "$0"
-            exit 0
-            ;;
+    -D)
+      SEARCH_DIR="$2"
+      FARGS[${#FARGS[*]}]="$1"
+      FARGS[${#FARGS[*]}]="$2"
+      shift
+      ;;
 
-        *)
-            GARGS[${#GARGS[*]}]="$1"
-            ;;
-    esac
-    shift
+    --remove) REMOVE=true ;;
+
+    --help)
+      usage "$0"
+      exit 0
+      ;;
+
+    *)
+      GARGS[${#GARGS[*]}]="$1"
+      ;;
+  esac
+  shift
 done
 
 if [ ${#GARGS[*]} -eq 0 ]; then
-    usage "$0"
-    echo -e "\nERROR: Missing pattern argument"
-    exit 1
+  usage "$0"
+  echo -e "\nERROR: Missing pattern argument"
+  exit 1
 fi
 
-findSource "${FARGS[@]}" | xargs grep "${GARGS[@]}"
+ESC_REMOVE=
+if $REMOVE; then
+  ESC_REMOVE="$(echo "$SEARCH_DIR/" | sed 's/[\/&]/\\&/g')"
+fi
+
+findSource "${FARGS[@]}" |
+  xargs grep -n --color=always "${GARGS[@]}" |
+  sed "s/$ESC_REMOVE//" |
+  ansiTruncate -w $(tput cols)

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [ "$DEPENDENT_CODE" == "" ]; then
+  echo "DEPENDENT_CODE not set"
+  exit 1
+fi
+
+if [ ! -d "$DEPENDENT_CODE" ]; then
+  echo "DEPENDENT_CODE does not point to an existing directory"
+  exit 1
+fi
+
+"$(dirname "$0")"/searchSource -D "$DEPENDENT_CODE" --remove -L "$@"
