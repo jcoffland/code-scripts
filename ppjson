@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+
+import sys
+import json
+import argparse
+
+
+parser = argparse.ArgumentParser(description = 'Pretty print JSON files')
+def _ap(*pos, **kw): parser.add_argument(*pos, **kw)
+
+_ap('path', metavar = 'FILE', help = 'JSON files')
+_ap('-u', '--update', action = 'store_true',
+    help = 'rewrite the input files in place')
+_ap('-i', '--indent', default = 2, type = int, metavar = 'NUMBER',
+    help = 'set indent level')
+_ap('-I', '--item-separator', default = ',', metavar = 'STRING',
+    help = 'separator between list items')
+_ap('-K', '--key-separator', default = ': ', metavar = 'STRING',
+    help = 'separator between keys and values')
+_ap('-s', '--sort-keys', action = 'store_true',
+    help = 'sort dictionaries by key')
+
+args = parser.parse_args()
+
+
+with open(args.path, 'r') as f: data = json.load(f)
+
+with open(args.path, 'w') if args.update else sys.stdout as f:
+  json.dump(data, f, ensure_ascii = False, check_circular = False,
+            indent = args.indent, sort_keys = args.sort_keys,
+            separators = (args.item_separator, args.key_separator))
